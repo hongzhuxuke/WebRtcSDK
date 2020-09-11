@@ -1,0 +1,3 @@
+[submodule "Interactive_live_SDK_win"]
+	path = Interactive_live_SDK_win
+	url = https://github.com/hongzhuxuke/Interactive_live_SDK_win.git
