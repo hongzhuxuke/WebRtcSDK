@@ -63,6 +63,12 @@
     <ClInclude Include="WebRTC\pictureDecoder.h">
       <Filter>源文件</Filter>
     </ClInclude>
+    <ClInclude Include="DevicesTool.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="UnilityTool.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="stdafx.cpp">
@@ -101,8 +107,11 @@
     <ClCompile Include="WebRTC\pictureDecoder.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ClassDiagram.cd" />
+    <ClCompile Include="DevicesTool.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+    <ClCompile Include="UnilityTool.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

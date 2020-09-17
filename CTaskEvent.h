@@ -10,17 +10,21 @@ enum TaskEventEnum
     TaskEventEnum_RE_SUBSCRIB,      //订阅流
     TaskEventEnum_SUBSCRIB_ERROR,      //订阅流失败
     TaskEventEnum_RECV_MEDIA_STREAM,      //订阅到插播或桌面共享视频流
-   TaskEventEnum_ROOM_RECONNECTED,         //房间重新链接，重新订阅
-   TaskEventEnum_SetSubscribe_PlayOutVol,   //设置订阅流扬声器音量
+    TaskEventEnum_SetSubscribe_PlayOutVol,
     TaskEventEnum_PREVIE_PLAY,
     TaskEventEnum_StartLocalCapture,
     TaskEventEnum_StartLocalAuxiliaryCapture,
     TaskEventEnum_StartLocalPicCapture,
     TaskEventEnum_StartPreviewLocalCapture,
+    TaskEventEnum_StartVLCCapture,
+    TaskEventEnum_StopMediaCapture,
+    TaskEventEnum_PreviewBeautyLevel,
+    TaskEventEnum_LocalCaptureBeautyLevel,
     TaskEventEnum_ON_STREAM_MIXED,
 
     TaskEventEnum_SET_MIC_DEV,
     TaskEventEnum_SET_PLAYER_DEV,
+    TaskEventEnum_SET_MEIDA_VOL,
 
     TaskEventEnum_CaptureLocalStream,
     TaskEventEnum_CaptureAuxiliaryLocalStream,
@@ -35,12 +39,17 @@ enum TaskEventEnum
     TaskEventEnum_STREAM_REMOVED,
     TaskEventEnum_STREAM_SUBSCRIBED_SUCCESS,
     TaskEventEnum_STREAM_RECV_LOST,
+    TaskEventEnum_STREAM_PUSH_ERROR,
 
     TaskEventEnum_ROOM_CONNECTED,
     TaskEventEnum_ROOM_ERROR,
     TaskEventEnum_ROOM_RECONNECTING,
+    TaskEventEnum_ROOM_RECONNECTED,
     TaskEventEnum_ROOM_RECOVER,
     TaskEventEnum_ROOM_NETWORKCHANGED,
+   
+    TaskEventEnum_ROOM_INIT_MEDIA_READER,
+
 };
 
 class CTaskEvent
@@ -61,7 +70,9 @@ public:
     int mErrorType = 0;
     int mMimulCastType = 0;
     int mVolume = 0;
-
+    int mBeautyLevel = 0;
+    int mMicIndex;
+    int mProfile = 0;
     unsigned long long mSeekPos = 0;
 
     std::wstring mStreamIndex;
@@ -73,10 +84,12 @@ public:
     std::string mErrMsg;
     std::string mJoinUid;
     std::string streamId;
-    std::wstring mUserId;
+    std::string mUserData;
     std::wstring desktopCaptureId;
 
     void* wnd = nullptr;
+
+
 };
 #endif
 

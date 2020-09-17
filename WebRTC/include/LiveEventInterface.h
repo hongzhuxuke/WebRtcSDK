@@ -12,14 +12,30 @@
 **===================================
 */
 
-class WebRtcSDKEventInterface {
+class VRtcEngineEventDelegate {
 public:
     /*
-    *   房间链接事件
+    *   RTC房间链接事件，包括连接成功、重连等状态上报。
     */
-    virtual void OnWebRtcRoomConnetEventCallback(const vlive::VHRoomConnectEnum,const std::string& joinId = "") = 0;
+    virtual void OnRtcRoomNetStateCallback(const vlive::RtcRoomNetState) = 0;
     /*
-    *   本地打开采集设备,包括摄像头、桌面共享、开始插播视频回调,
+    *    开启旁路混流事件回调
+    */
+    virtual void OnConfigBroadCast(const int layout,const int profile, const std::string& result, const std::string& msg) = 0;
+    /*
+    *    停止旁路混流事件回调
+    */
+    virtual void OnStopConfigBroadCast(const std::string& result, const std::string& msg) = 0;
+    /*
+    *    设置旁路事件回调
+    */
+    virtual void OnChangeConfigBroadCastLayout(const int layout,const std::string& result, const std::string& msg) = 0;
+    /*
+    *    设置大画面布局
+    */
+    virtual void OnSetMainView(const std::string main_view_stream_id, int stream_type, const std::string& result, const std::string& msg) = 0;
+    /*
+    *   本地打开采集设备,包括摄像头、桌面共享、初始化插播视频等回调,
     */
     virtual void OnOpenCaptureCallback(vlive::VHStreamType streamType, vlive::VHCapture code, bool hasVideo, bool hasAudio) = 0;
     /*
@@ -29,7 +45,7 @@ public:
     /*
     *   推流失败回调
     */
-    virtual void OnPushStreamError(std::string streamId, vlive::VHStreamType streamType, const int codeErr = 0, const std::string& msg = std::string()) = 0;
+    virtual void OnPushStreamError(vlive::VHStreamType streamType, const int codeErr = 0, const std::string& msg = std::string()) = 0;
     /*
     *   本地网络重连成功之后重推流，流ID发生改变通知
     **/
@@ -46,26 +62,21 @@ public:
     /**
     *   订阅流失败。
     */
-    virtual void OnSubScribeStreamErr(const std::string& user_id, const std::string& msg,int errorCode) = 0;
+    virtual void OnSubScribeStreamErr(const std::string& stream_id, const std::string& msg,int errorCode, const std::string& join_id = std::string()) = 0;
     /*
     *    接收到远端的媒体流  hasVideo ：是否包含视频
     *    当接收到远端媒体流包括插播视频流或者桌面共享流，如果本地已经打开插播或桌面共享时自动停止。
     */
-    virtual void OnReciveRemoteUserLiveStream(const std::wstring& user, const std::string& streamid, const vlive::VHStreamType type, bool hasVideo, bool hasAudio) = 0;
+    virtual void OnReciveRemoteUserLiveStream(const std::wstring& user, const std::string& streamid, const vlive::VHStreamType type, bool hasVideo, bool hasAudio, const std::string user_data) = 0;
     /*
     *   远端的媒体流退出了
     */
-    virtual void OnRemoveRemoteUserLiveStream(const std::wstring& user, const std::string& stream, const vlive::VHStreamType type) = 0;
-
-    /*
-    *  
-    */
-    virtual void OnStreamMixed(const std::string& user, const std::string& stream, int type) = 0;
     virtual void OnRemoteUserLiveStreamRemoved(const std::wstring& user, const std::string& streamid, const vlive::VHStreamType type) = 0;
     /*
     *   订阅大小流回调
     */
-    virtual void OnChangeSubScribeUserSimulCast(const std::wstring& user_id, vlive::VHSimulCastType type,int code, std::string msg) = 0;
+    virtual void OnChangeSubScribeUserSimulCast(const std::wstring& user_id, vlive::VHSimulCastType type, int code, std::string msg) = 0;
+
 };
 
 #endif // !H_WEBRTRCSDK_EVENT_INTERFACE_H

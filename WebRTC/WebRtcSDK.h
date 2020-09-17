@@ -1,4 +1,4 @@
- #pragma once
+#pragma once
 
 #include "WebRtcSDKInterface.h"
 #include "signalling/vh_connection.h"
@@ -9,8 +9,7 @@
 #include "signalling/vh_stream.h" 
 #include "signalling/tool/AudioPlayDeviceModule.h"
 #include "signalling/tool/AudioSendFrame.h"
-#include "signalling/tool/VideoRenderReceiver.h"
-#include "signalling/BaseStack/statsInfo.h"
+//#include "signalling/BaseStack/GetStatsObserver.h"
 #include <atomic>
 #include <string>
 #include <list>
@@ -22,11 +21,14 @@
 #include <string>
 #include "SubScribeStreamManager.h"
 #include "CAudioVolume.h"
+#include "DevicesTool.h"
 
 
 #define VhallWebRTC_VERSION "1.0.0.0"
 #define SDK_SUCCESS "success"
 #define SDK_FAILED  "failed"
+#define SDK_TIMEOUT 25000
+
 
 using namespace vlive;
 class WebRtcSDK : public WebRtcSDKInterface, public vhall::AudioSendFrame
@@ -36,105 +38,73 @@ public:
    virtual ~WebRtcSDK();
 
    virtual void SendAudioData(const void * audio_data, int bits_per_sample, int sample_rate, size_t number_of_channels, size_t number_frames_perChannel);
-   virtual void InitSDK(WebRtcSDKEventInterface* obj, std::wstring logPath = std::wstring());
+   virtual void InitSDK(VRtcEngineEventDelegate* obj, std::wstring logPath = std::wstring());
    virtual void SetDebugLogAddr(const std::string& addr);
+
+   virtual void SubScribeRemoteStream(const std::string &stream_id, int delayTimeOut = 0);
    virtual int ConnetWebRtcRoom(const vlive::WebRtcRoomOption& option);
    virtual int DisConnetWebRtcRoom();
-   virtual bool isConnetWebRtcRoom();
-   virtual void ClearSubScribeStream();
-   static int ParamPushType(std::string& context);
-   /*
-    *   是否自动订阅流
-    */
-   virtual void EnableSubScribeStream();
-   virtual void DisableSubScribeStream();
-   virtual void SubScribeRemoteStream(const std::string &stream_id, int delayTimeOut = 0);
-
-   //大/小 流控制
    virtual void EnableSimulCast(bool enable);
    virtual bool ChangeSubScribeUserSimulCast(const std::wstring& user_id, vlive::VHStreamType streamType, VHSimulCastType type);
-   /*
-*   获取订阅流自定义消息
-*/
-   virtual std::string GetSubStreamUserData(const std::wstring& user);
-
    virtual bool IsWebRtcRoomConnected();
    virtual bool StartRenderLocalStream(vlive::VHStreamType streamType, void* wnd);
-   virtual bool StartRenderLocalStreamByInterface(vlive::VHStreamType streamType, std::shared_ptr<vhall::VideoRenderReceiveInterface> receive);
-   virtual bool IsStreamExit(std::string id);
-   
-   //渲染远端流
+   virtual bool StartRenderLocalStream(vlive::VHStreamType streamType, std::shared_ptr<vhall::VideoRenderReceiveInterface> recv);
+
+
    virtual bool StopRenderRemoteStream(const std::wstring& user, const std::string streamId, vlive::VHStreamType streamType);
    virtual bool StartRenderRemoteStream(const std::wstring& user, vlive::VHStreamType streamType, void* wnd);
-   virtual bool StartRenderRemoteStreamByInterface(const std::wstring& user, vlive::VHStreamType streamType, std::shared_ptr<vhall::VideoRenderReceiveInterface> receive);
-   virtual bool IsRemoteStreamIsExist(const std::wstring& user, vlive::VHStreamType streamType);
-   //开始采集
-   /*
-   * doublePush : 是否推大/小 流
-   */
+   virtual bool StartRenderRemoteStream(const std::wstring& user, vlive::VHStreamType streamType, std::shared_ptr<vhall::VideoRenderReceiveInterface> recv);
    virtual int StartLocalCapture(const std::string devId, VideoProfileIndex, bool doublePush = false);
-   virtual int StartLocalAuxiliaryCapture(const std::string devId, VideoProfileIndex index);  //双推画面推流
+   virtual int StartLocalAuxiliaryCapture(const std::string devId, VideoProfileIndex index);
    virtual int StartLocalCapturePicture(const std::string filePath, VideoProfileIndex index, bool doublePush = false);
-   virtual int StartLocalCapturePlayer(const int dev_index, const std::wstring dev_id, const int volume);
-   //开始推流
-   virtual int StartPushLocalStream();
-   virtual int StartPushLocalAuxiliaryStream(std::string context = std::string());
-   //停止采集
+   virtual int CheckPicEffectiveness(const std::string filePath);
+   virtual int StartLocalCapturePlayer(const std::wstring dev_id, const int volume);
+   virtual int SetLocalCapturePlayerVolume(const int volume);
    virtual int StopLocalCapturePlayer();
    virtual void StopLocalCapture();
    virtual void StopLocalAuxiliaryCapture();
-
-   //停止推流
+   virtual void StopRecvAllRemoteStream();
+   virtual int StartPreviewCamera(void* wnd, const std::string& devGuid, VideoProfileIndex index, int micIndex = -1);
+   virtual int StartPreviewCamera(std::shared_ptr<vhall::VideoRenderReceiveInterface> recv, const std::string& devGuid, VideoProfileIndex index, int micIndex = -1);
+   virtual int GetPrevieMicVolumValue();
    virtual int StopPreviewCamera();
+   virtual int StartPushLocalStream();
    virtual int StopPushLocalStream();
+   virtual int StartPushLocalAuxiliaryStream(std::string context = std::string());
    virtual int StopPushLocalAuxiliaryStream();
-
-   virtual void StopRecvAllRemoteStream();//停止接受远端流
-
-   virtual int CheckPicEffectiveness(const std::string filePath);
-   virtual int SetLocalCapturePlayerVolume(const int volume);
-   virtual int PreviewCamera(void* wnd, const std::string& devGuid, VideoProfileIndex index, int micIndex = -1);  //回显显示器
-   virtual void ChangePreViewMic(int micIndex);
-   virtual int GetMicVolumValue();
-
-   //混流端布局设置
    virtual bool IsEnableConfigMixStream();
    virtual void SetEnableConfigMixStream(bool enable);
-   //开启旁路混流
    virtual int StartConfigBroadCast(LayoutMode layoutMode, int width, int height, int fps, int bitrate, bool showBorder, std::string boradColor = std::string("0x666666"), std::string backGroundColor = std::string("0x000000"), SetBroadCastEventCallback fun = nullptr);
    virtual int StartConfigBroadCast(LayoutMode layoutMode, BroadCastVideoProfileIndex profileIndex, bool showBorder, std::string boradColor = std::string("0x666666"), std::string backGroundColor = std::string("0x000000"), SetBroadCastEventCallback fun = nullptr);
-   //修改旁路布局
    virtual int SetConfigBroadCastLayOut(LayoutMode mode, SetBroadCastEventCallback fun = nullptr);
-   //
    virtual std::string GetUserStreamID(const std::wstring user_id, VHStreamType streamType);
    virtual bool GetCaptureStreamType(const std::wstring& user_id, vlive::VHStreamType streamType, vlive::CaptureStreamAVType type);
-   virtual int OperateRemoteUserVideo(std::wstring user_id, bool close = false);//打开、关闭远端用户本地视频
-   virtual int OperateRemoteUserAudio(std::wstring user_id, bool close = false);//打开、关闭远端用户本地声音
-  //判断设备是否支持
-   virtual bool IsSupported(const std::string& devGuid, VideoProfileIndex iProfileIndex);
-   //virtual bool IsSupported(const std::string devId, VideoProfileIndex iProfileIndex)
-   //设置大流
-   virtual int SetMixLayoutMainView(std::string stream, SetBroadCastEventCallback fun = nullptr);
-   //停止旁路混流
-   virtual int StopBroadCast();
+   virtual int OperateRemoteUserVideo(std::wstring user_id, bool close = false);
+   virtual int OperateRemoteUserAudio(std::wstring user_id, bool close = false);
 
+   virtual bool IsSupported(const std::string devId, VideoProfileIndex iProfileIndex);
+   virtual int SetMixLayoutMainView(std::string stream, SetBroadCastEventCallback fun = nullptr);
+   virtual int StopBroadCast(SetBroadCastEventCallback fun = nullptr);
    virtual int StartDesktopCapture(int64_t index, VideoProfileIndex profileIndex);
    /*停止桌面共享采集*/
    virtual void StopDesktopCapture();
+
+   virtual int SetDesktopEdgeEnhance(bool enable);
    /*开始桌面共享采集推流*/
-   virtual int StartPushDesktopStream(std::string context);
+   virtual int StartPushDesktopStream();
    /*停止桌面共享采集推流*/
    virtual int StopPushDesktopStream();
    /*当前采集类型是否正在推流*/
    virtual bool IsPushingStream(vlive::VHStreamType streamType);
-   /*当前房间是否存在给定类型的远端流*/
-   virtual bool IsExitSubScribeStream(const vlive::VHStreamType& streamType);
-   virtual bool IsExitSubScribeStream(const std::string& id, const vlive::VHStreamType& streamType);
-
-   /**   当前互动房间是否存在给定类型的视频流*/
+   /**   当前互动房间是否存在插播视频流*/
    virtual bool IsCapturingStream(vlive::VHStreamType streamType);
    virtual int GetPlayMeidaFileWidthAndHeight(std::string filePath, int& srcWidth, int &srcHeight);
-   virtual int StartPlayMediaFile(std::string filePath, VideoProfileIndex profileIndex, long long seekPos = 0);
+   virtual int InitMediaFile();
+   virtual bool PlayFile(std::string file, VideoProfileIndex profileIndex);
+   /*
+   *  插播文件是否带有视频画面。
+   */
+   virtual bool IsPlayFileHasVideo();
    virtual void ChangeMediaFileProfile(VideoProfileIndex profileIndex);
    virtual bool IsSupportMediaFormat(CaptureStreamAVType type);
    /*停止插播文件*/
@@ -162,13 +132,20 @@ public:
    /**获取扬声器列表**/
    virtual int GetPlayerDevices(std::list<vhall::AudioDevProperty> &playerDevList);
 
-   virtual int GetCameraDevDetails(std::list<CameraDetailsInfo> &cameraDetails);
    /*
    *  是否存在音频或视频设备。
    *  返回值：只要存在一类设备 返回true, 如果音视频设备都没有则返回false
    **/
    virtual bool HasVideoOrAudioDev();
+   /*
+   *  是否存在视频设备。
+   *  返回值：只要存在一类设备 返回true, 如果音视频设备都没有则返回false
+   **/
    virtual bool HasVideoDev();
+   /*
+   *  是否存在音频设备。
+   *  返回值：只要存在一类设备 返回true, 如果音视频设备都没有则返回false
+   **/
    virtual bool HasAudioDev();
    /*
    *  设置使用的麦克风
@@ -197,6 +174,7 @@ public:
    ***/
    virtual void GetCurrentPlayOut(int &index, std::string& devId);
    virtual int SetCurrentMicVol(int vol);
+
    virtual int SetCurrentPlayVol(int vol);
    virtual int GetCurrentMicVol();
    virtual int GetCurrentPlayVol();
@@ -240,6 +218,9 @@ public:
    void PlayFileCallback(int code);
    void ProcessTask();
    static DWORD WINAPI ThreadProcess(LPVOID p);
+   static DWORD WINAPI MediaCoreThreadProcess(LPVOID p);
+
+
    /*
    *    获取窗口共享和桌面共享列表
    **  vlive::VHStreamType      // 3:Screen,5:window
@@ -249,6 +230,12 @@ public:
    virtual int SelectSource(int64_t id);
    /*停止软件源共享采集*/
    virtual void StopSoftwareCapture();
+   /**
+   *  接口说明：检测是否支持美颜功能，此接口需要在调用[StartPreviewCamera]接口之后调用。
+   **/
+   virtual bool IsSupprotBeauty();
+   int SetCameraBeautyLevel(int level);
+   int SetPreviewCameraBeautyLevel(int level);
    /*停止软件共享采集推流*/
    virtual int StopPushSoftWareStream();
    /*开始软件共享采集推流*/
@@ -258,31 +245,50 @@ public:
    */
    virtual int MuteAllSubScribeAudio(bool mute);
    virtual bool GetMuteAllAudio();
-   VHStreamType  CalcStreamType(const bool& bAudio, const bool& bVedio);
-   
-   virtual std::string GetAuxiliaryId();
-   virtual std::string GetLocalAuxiliaryId();
-   virtual bool IsPlayFileHasVideo();
-   virtual void GetStreams(std::list<std::string>& streams);
-   virtual std::string LocalStreamId();
+
+
+   void FastInitMediaCore();
    /**
-  *  获取推流视频丢包率.3秒读一次
-  */
+   *  获取推/拉流音频音量等级
+   */
+   virtual int GetAudioLevel(std::wstring user_id);
+
+   /**
+   *  获取推/拉流视频丢包率
+   */
+   virtual double GetVideoLostRate(std::wstring user_id);
+   /**
+   *  获取推/拉流视频丢包率
+   */
    virtual double GetPushDesktopVideoLostRate();
 private:
    void ExitThread();
    bool RemoveSubScribeStreamObj(const std::wstring &userId, std::string stream_id);
    std::string GetSubScribeStreamID(const std::wstring &userId);
    void HandleRePublished(int type, std::wstring& user_id, std::string& new_streamId);
-   int PrepareMediaFileCapture(VideoProfileIndex profileIndex, long long seekPos);
-
+   int PrepareMediaFileCapture(VideoProfileIndex profileIndex);
    static void OnPlayMediaFileCb(int, void *);
    void CheckAssistFunction(int type, bool streamRemove);
-   void PushFrontEvent(CTaskEvent task);
+
    void PostTaskEvent(CTaskEvent task);
+   void PushFrontEvent(CTaskEvent task);
    void RelaseStream(std::shared_ptr<vhall::VHStream>&);
+   /**
+      ROOM_DISCONNECTED   房间已断开，已停止推拉流
+      ROOM_RECONNECTED    已重新进入房间，已停止推拉流； 无法自动拉流（app结合业务从最新流列表判断是否拉流）；若正在推本地流，SDK自动重新推流（重新推流失败应当跑出stream_fail事件,新信令版本实现）；
+      ROOM_CONNECTED      进入房间成功，返回最新流列表
+      ROOM_NETWORKCHANGED 发现本地IP（网卡）发生变化且已重新进入房间，SDK自动恢复推拉流，完成返回ROOM_NETWORKRECOVER
+      ROOM_NETWORKRECOVER 推拉流恢复操作完成
+      ROOM_CONNECTING     首次连接房间失败，重新建立连接
+      ROOM_RECONNECTING   连接断开，正在尝试重连
+   */
+   void RegisterRoomConnected();
+   void RegisterRoomError();
+   void RegisterDeviceEvent();
+   void RegisterStreamEvent();
+   void RegisterLocalCaptureEvent(std::shared_ptr<vhall::VHStream>&);
 
-
+   int ParamPushType(std::string& context);
    int HandleStartLocalAuxiliaryCapture(const std::string devId, VideoProfileIndex index);
    int HandleStartLocalCapture(const std::string devId, VideoProfileIndex index, bool doublePush);
    int HandleStartLocalCapturePicture(const std::string filePath, VideoProfileIndex index, bool doublePush);
@@ -292,6 +298,10 @@ private:
    void HandleRoomStreamSubScribeError(CTaskEvent &task);
    void HandleRoomError(CTaskEvent& event);
    void HandleOnStreamMixed(CTaskEvent& event);
+   void HandleStreamPushError(CTaskEvent& event);
+   void HandleLocalCaptureBeautyLevel(CTaskEvent& event);
+   void HandlePreviewBeautyLevel(CTaskEvent& event);
+
    void HandleRoomReConnecting(CTaskEvent& event);
    void HandleRoomReConnected(CTaskEvent& event);
    void HandleRoomRecover(CTaskEvent& event);
@@ -300,6 +310,8 @@ private:
    void HandleStreamFailed(CTaskEvent& event);
    void HandleStreamRemoved(CTaskEvent& event);
    void HandleStreamSubSuccess(CTaskEvent& event);
+   void HandleStartVLCCapture(CTaskEvent& event);
+   void HandleStopMediaCapture();
    void HandlePrivew(CTaskEvent &event);
    void HandleCaptureLocalStream(CTaskEvent &event);
    void HandleCaptureAuxiliaryLocalStrea(CTaskEvent &event);
@@ -310,10 +322,10 @@ private:
    void HandleRecvStreamLost(CTaskEvent &event);
    void HandleSetMicDev(CTaskEvent& event);
    void HandleSetPlayerDev(CTaskEvent& event);
-   void ClearAllLocalStream();
-   
-private:
+   void HandleSetPlayFileVol(CTaskEvent &event);
+   void ReleaseAllLocalStream();
 
+private:
    CThreadLock mRoomThreadLock;
    std::shared_ptr<vhall::VHRoom> mLiveRoom = nullptr;
 
@@ -322,9 +334,12 @@ private:
 
    CThreadLock mLocalStreamThreadLock;
    std::shared_ptr<vhall::VHStream> mLocalStream = nullptr;
-   HWND mLocalStreamWnd;
-   std::shared_ptr<vhall::VideoRenderReceiveInterface> mLocalStreamReceive = nullptr;
-   bool mbReceive = false;
+   vhall::LiveVideoFilterParam mLocalStreamFilterParam;
+
+   std::shared_ptr<vhall::SendVideoSsrc> mVideoSsrc = nullptr;
+   bool mLastCaptureIsCamera = false;
+   HWND mLocalStreamWnd = nullptr;
+   std::shared_ptr<vhall::VideoRenderReceiveInterface> mLocalCameraRecv = nullptr;
    std::atomic_bool mLocalStreamIsCapture = false;    //是否正在采集
 
    CThreadLock mLocalAuxiliaryStreamThreadLock;
@@ -334,15 +349,18 @@ private:
 
    CThreadLock mPreviewStreamThreadLock;
    std::shared_ptr<vhall::VHStream> mPreviewLocalStream = nullptr; //摄像头预览
+   std::shared_ptr<vhall::VideoRenderReceiveInterface> mPreviewVideoRecver = nullptr;
 
    CThreadLock mMediaStreamThreadLock;
    std::shared_ptr<vhall::VHStream> mMediaStream = nullptr;
    std::atomic_bool mMediaStreamIsCapture = false;
+   vhall::LiveVideoFilterParam mMediaStreamFilterParam;
 
    CThreadLock mDesktopStreamThreadLock;
    std::shared_ptr<vhall::VHStream> mDesktopStream = nullptr;
-   std::shared_ptr<vhall::SendVideoSsrc> mDesktopVideoSsrc = nullptr;
    std::atomic_bool mDesktopStreamIsCapture = false;
+   std::shared_ptr<vhall::SendVideoSsrc> mDesktopVideoSsrc = nullptr;
+   vhall::LiveVideoFilterParam mDesktopStreamFilterParam;
 
    CThreadLock mSoftwareStreamThreadLock;
    std::shared_ptr<vhall::VHStream> mSoftwareStream = nullptr;
@@ -353,13 +371,13 @@ private:
    std::string mDesktopStreamId;
    std::string mMediaFileStreamId;
    std::string mSoftwareStreamId;
-   //std::string mCurPlayFileName;
+   std::string mCurPlayFileName;
 
    std::string mCurPlayFile;
 
    std::atomic_bool mbIsWebRtcRoomConnected = false;
    vlive::WebRtcRoomOption mWebRtcRoomOption;
-   WebRtcSDKEventInterface *mWebRtcSDKEventReciver = nullptr;
+   VRtcEngineEventDelegate *mWebRtcSDKEventReciver = nullptr;
 
    static SubScribeStreamManager mSubScribeStreamManager;
 
@@ -392,14 +410,13 @@ private:
    CThreadLock mBroadCastLayoutMutex;
    SetBroadCastEventCallback mBroadCastLayoutCallback = nullptr;
 
-   CThreadLock mainViewMutex;
-   SetBroadCastEventCallback mMainViewCallback = nullptr;
-
    HWND previewWnd = nullptr;
 
    HANDLE mHThread = nullptr;
    std::thread* mProcessThread = nullptr;
    DWORD  threadId = 0;
+
+   std::thread* mMediaCoreProcessThread = nullptr;   //插播初始化vlc 会阻塞。所以启动一个线程先创建vlc实例
 
    std::atomic_bool mbIsInit = false;
    static HANDLE gTaskEvent;
@@ -410,11 +427,8 @@ private:
 
    std::atomic_bool mSettingCurrentLayoutMode;
    std::atomic_bool mbIsMixedAlready = false;          //是否可以配置混流和大屏
-   std::atomic_bool bAutoSubScribeStream = true;       //登录房间后是否自动订阅流。 
    std::atomic_bool mMuteAllAudio = false;             //静音所有订阅的流
    std::atomic_bool mbStopPreviewCamera = true;           //是否已经开启摄像头预览
 
-   int iStreamMixed = 0;
-   int iHandleStreamMixed = 0;
-   bool mLastCaptureIsCamera = false;
+
 };

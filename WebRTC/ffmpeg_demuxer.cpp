@@ -58,9 +58,6 @@ namespace vhall {
          AVStream *stream;
          AVCodecParameters *codecpar;
          stream = mIfmtCtx->streams[i];
-         if (stream == nullptr) {
-             break;
-         }
          codecpar = stream->codecpar;
          /* analyze Audio/Video foramt/Codec info */
          if (codecpar->codec_type == AVMEDIA_TYPE_VIDEO && !hasVideo) {

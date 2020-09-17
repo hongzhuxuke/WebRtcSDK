@@ -7,8 +7,6 @@
 #include <shlobj.h>
 #include <shlwapi.h>
 
-#pragma warning(disable:4996)
-
 namespace webrtc_sdk {
 
     int GenerateLogId() {
@@ -402,7 +400,7 @@ namespace webrtc_sdk {
             }
         }
         else {
-            std::wstring logFullPath = filePath + L"\\VhallClass\\WebRtcSDK";
+            std::wstring logFullPath = filePath + L"\\WebRtcSDK";
             PathAppend(fullPath, logFullPath.c_str());
             TcharToChar(logFullPath.c_str(), FilePath);
         }

@@ -1,9 +1,7 @@
 #include "SubScribeStreamManager.h"
 #include "./WebRTC/vhall_sdk_log.h"
 #include "WebRtcSDKInterface.h"
-#pragma warning(disable:4996)
-#include "WebRtcSDK.h"
-
+#include "signalling\BaseStack\statsInfo.h"
 using namespace webrtc_sdk;
 SubScribeStreamManager::SubScribeStreamManager()
 {
@@ -14,7 +12,7 @@ SubScribeStreamManager::~SubScribeStreamManager()
 {
 }
 
-void SubScribeStreamManager::RegisterRoomObj(std::shared_ptr<vhall::VHRoom> obj, WebRtcSDKEventInterface* callback) {
+void SubScribeStreamManager::RegisterRoomObj(std::shared_ptr<vhall::VHRoom> obj, VRtcEngineEventDelegate* callback) {
     mLiveRoom = obj;
     mWebRtcSDKEventReciver = callback;
 }
@@ -28,11 +26,23 @@ void SubScribeStreamManager::InsertSubScribeStreamObj(const std::wstring &subStr
     if (iter == mSubScribeStreamMap.end()) {
         LOGD_SDK("insert userId:%ws stream:%s", subStreamIndex.c_str(), stream->GetID());
         mSubScribeStreamMap.insert(make_pair(subStreamIndex, stream));
+        std::map<std::wstring, std::shared_ptr<vhall::ReceiveVideoSsrc>>::iterator iterSsrc = mVideoSsrcMap.find(subStreamIndex);
+        if (iterSsrc == mVideoSsrcMap.end()) {
+           std::shared_ptr<vhall::ReceiveVideoSsrc> desktopVideoSsrc = std::make_shared<vhall::ReceiveVideoSsrc>();
+           mVideoSsrcMap.insert(make_pair(subStreamIndex, desktopVideoSsrc));
+        }
     }
     else {
         LOGD_SDK("replace userId:%ws stream:%s", subStreamIndex.c_str(), stream->GetID());
+        std::map<std::wstring, std::shared_ptr<vhall::ReceiveVideoSsrc>>::iterator iterSsrc = mVideoSsrcMap.find(subStreamIndex);
+        if (iterSsrc != mVideoSsrcMap.end()) {
+           iterSsrc->second.reset();
+           mVideoSsrcMap.erase(iterSsrc);
+        }
         mSubScribeStreamMap.erase(iter);
         mSubScribeStreamMap.insert(make_pair(subStreamIndex, stream));
+        std::shared_ptr<vhall::ReceiveVideoSsrc> desktopVideoSsrc = std::make_shared<vhall::ReceiveVideoSsrc>();
+        mVideoSsrcMap.insert(make_pair(subStreamIndex, desktopVideoSsrc));
     }
     LOGD_SDK("%s end", __FUNCTION__);
 }
@@ -65,8 +75,12 @@ bool SubScribeStreamManager::RemoveSubScribeStreamObj(const std::wstring &subStr
     if (iter != mSubScribeStreamMap.end()) {
         LOGD_SDK("find user:%ws stream_id:%s", subStreamIndex.c_str(), stream_id.c_str());
         if (std::string(iter->second->GetID()) == stream_id) {
-           std::shared_ptr<vhall::VHStream> stream = iter->second;
             mSubScribeStreamMap.erase(iter);
+            std::map<std::wstring, std::shared_ptr<vhall::ReceiveVideoSsrc>>::iterator iterSsrc = mVideoSsrcMap.find(subStreamIndex);
+            if (iterSsrc != mVideoSsrcMap.end()) {
+               iterSsrc->second.reset();
+               mVideoSsrcMap.erase(iterSsrc);
+            }
             LOGD_SDK("find and delete stream");
             return true;
         }
@@ -97,6 +111,11 @@ void SubScribeStreamManager::StopSubScribeStream() {
             mLiveRoom->UnSubscribe(iter->second, [&](const vhall::RespMsg& resp) {
                 LOGD_SDK("resp mResult:%s", resp.mResult.c_str());
             }, 3000);
+            std::map<std::wstring, std::shared_ptr<vhall::ReceiveVideoSsrc>>::iterator iterSsrc = mVideoSsrcMap.find(iter->first);
+            if (iterSsrc != mVideoSsrcMap.end()) {
+               iterSsrc->second.reset();
+               mVideoSsrcMap.erase(iterSsrc);
+            }
         }
         iter = mSubScribeStreamMap.erase(iter);
     }
@@ -126,9 +145,7 @@ int SubScribeStreamManager::GetSubScribeStreamFormat(const std::wstring& user, v
 }
 
 bool SubScribeStreamManager::IsSubScribeDesktopStream() {
-
-    LOGD_SDK("%s enter", __FUNCTION__);
-
+    LOGD_SDK("enter");
     CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
     LOGD_SDK("%s start", __FUNCTION__);
     std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
@@ -160,15 +177,12 @@ bool SubScribeStreamManager::IsSubScribeSoftwareStream()
         }
         iter++;
     }
-    LOGD_SDK("%s end",__FUNCTION__);
-
+    LOGD_SDK("%s end", __FUNCTION__);
     return false;
 }
 
 bool SubScribeStreamManager::IsSubScribeMediaFileStream() {
-
-    LOGD_SDK("%s enter", __FUNCTION__);
-
+    LOGD_SDK("enter");
     CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
     LOGD_SDK("%s start", __FUNCTION__);
     std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
@@ -185,8 +199,6 @@ bool SubScribeStreamManager::IsSubScribeMediaFileStream() {
     return false;
 }
 
-
-
 bool SubScribeStreamManager::IsSubScribedStreamByUserId(const std::wstring& subStreamIndex) {
     LOGD_SDK("enter");
     CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
@@ -200,22 +212,8 @@ bool SubScribeStreamManager::IsSubScribedStreamByUserId(const std::wstring& subS
     return false;
 }
 
-std::string SubScribeStreamManager::GetUserData(const std::wstring& user_id) {
-   LOGD_SDK("%s ", __FUNCTION__);
-    CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
-    LOGD_SDK("user_id:%ws", user_id.c_str());
-    std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(user_id);
-    if (iter != mSubScribeStreamMap.end()) {
-       LOGD_SDK("find remote user");
-        return iter->second->mStreamAttributes;
-    }
-    LOGD_SDK("can not find remote user");
-    return std::string();
-}
-
 bool SubScribeStreamManager::IsHasMediaType(const std::wstring& subStreamIndex, vlive::CaptureStreamAVType type) {
     LOGD_SDK("mSubScribeStreamMutex");
-
     CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
     std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(subStreamIndex);
     if (iter != mSubScribeStreamMap.end()) {
@@ -230,6 +228,32 @@ bool SubScribeStreamManager::IsHasMediaType(const std::wstring& subStreamIndex, 
     }
     LOGD_SDK("can not find remote user");
     return false;
+}
+
+
+
+bool SubScribeStreamManager::StartRenderStream(const std::wstring& subStreamIndex, std::shared_ptr<vhall::VideoRenderReceiveInterface> recv) {
+   LOGD_SDK("enter");
+   CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
+   LOGD_SDK("StartRenderStream subStreamIndex:%s", subStreamIndex.c_str());
+   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(subStreamIndex);
+   if (iter != mSubScribeStreamMap.end()) {
+      if (iter->second != nullptr) {
+         std::string user = iter->second->GetUserId();
+         std::string stream = iter->second->GetID();
+         LOGD_SDK("StartRenderStream user:%s stream:%s", iter->second->GetUserId(), stream.c_str());
+         iter->second->stop();
+         iter->second->play(recv);
+         LOGD_SDK("play remote end");
+         return true;
+      }
+      else
+      {
+         LOGD_SDK("mSubScribeStreamMap.size: %d subStreamIndex %ws ", mSubScribeStreamMap.size(), subStreamIndex);
+      }
+   }
+   LOGD_SDK("can not find user,can not play");
+   return false;
 }
 
 bool SubScribeStreamManager::StartRenderStream(const std::wstring& subStreamIndex, void* wnd) {
@@ -255,38 +279,6 @@ bool SubScribeStreamManager::StartRenderStream(const std::wstring& subStreamInde
     }
     LOGD_SDK("can not find user,can not play");
     return false;
-}
-
-bool SubScribeStreamManager::StartRenderRemoteStreamByInterface(const std::wstring& subStreamIndex, std::shared_ptr<vhall::VideoRenderReceiveInterface> receive)
-{
-   LOGD_SDK("enter");
-   CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
-   LOGD_SDK("StartRenderStream subStreamIndex:%s", subStreamIndex.c_str());
-   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(subStreamIndex);
-   if (iter != mSubScribeStreamMap.end()) {
-      if (iter->second != nullptr) {
-         std::string user = iter->second->GetUserId();
-         std::string stream = iter->second->GetID();
-         LOGD_SDK("StartRenderStream user:%s stream:%s", iter->second->GetUserId(), stream.c_str());
-         iter->second->stop();
-         //HWND playWnd = (HWND)(wnd);
-         iter->second->play(receive);
-         LOGD_SDK("play remote end");
-         return true;
-      }
-      else
-      {
-         LOGD_SDK("mSubScribeStreamMap.size: %d subStreamIndex %ws ", mSubScribeStreamMap.size(), subStreamIndex);
-      }
-   }
-   LOGD_SDK("can not find user,can not play");
-   return false;
-}
-
-bool SubScribeStreamManager::IsRemoteStreamIsExist(const std::wstring & user)
-{
-   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(user);
-   return iter != mSubScribeStreamMap.end();
 }
 
 bool SubScribeStreamManager::StopRenderRemoteStream(const std::wstring& subStreamIndex) {
@@ -347,22 +339,6 @@ int SubScribeStreamManager::OperateRemoteUserAudio(std::wstring user_id, bool cl
     return vlive::VhallLive_NO_OBJ;
 }
 
-
-void SubScribeStreamManager::SetPlayIndexAndVolume(const std::wstring& index, int PlayerIndex, int PlayVol) {
-    //LOGD_SDK("%s PlayerIndex %d PlayVol:%d", __FUNCTION__, PlayerIndex, PlayVol);
-    //CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
-    //std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(index);
-    //if (iter != mSubScribeStreamMap.end()) {
-    //    if (iter->second != nullptr) {
-    //        LOGD_SDK("%s find stream", __FUNCTION__);
-    //        //iter->second->SetAudioOutDevice(PlayerIndex);
-    //        iter->second->SetAudioOutVolume(PlayVol);
-    //    }
-    //}
-    //LOGD_SDK("%s end", __FUNCTION__);
-}
-
-
 void SubScribeStreamManager::MuteAllSubScribeAudio(bool mute) {
     LOGD_SDK("enter :%d", mute);
     CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
@@ -376,198 +352,7 @@ void SubScribeStreamManager::MuteAllSubScribeAudio(bool mute) {
     LOGD_SDK("end");
 }
 
-bool SubScribeStreamManager::IsExitStream(const vlive::VHStreamType& streamType)
-{
-   bool ref = false;
-   switch (streamType)
-   {
-   case vlive::VHStreamType_AUDIO:
-   case vlive::VHStreamType_VIDEO:
-   case vlive::VHStreamType_AVCapture: {
-      ref = false;
-      std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-      while (iter != mSubScribeStreamMap.end()) {
-         if (iter->second != nullptr) {
-            std::string context = iter->second->mStreamAttributes;
-
-            if (context.empty() && iter->second->mStreamType <= vlive::VHStreamType_AVCapture) {
-               ref = true;
-               break;
-            }
-         }
-         iter++;
-      }
-   }
-                                       break;
-   case vlive::VHStreamType_Desktop:
-   case vlive::VHStreamType_MediaFile:
-   case vlive::VHStreamType_SoftWare:
-   case vlive::VHStreamType_RegionShare:
-   case vlive::VHStreamType_Preview_Video:
-   {
-         ref = false;
-         std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-         while (iter != mSubScribeStreamMap.end()) {
-            if (iter->second != nullptr) {
-               std::string context = iter->second->mStreamAttributes;
-
-               if (context.empty() && iter->second->mStreamType == streamType) {
-                  ref = true;
-                  break;
-               }
-            }
-            iter++;
-         }
-    }
-    break;
-   case vlive::VHStreamType_Auxiliary_CamerCapture:
-   {
-      ref = false;
-      std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-      while (iter != mSubScribeStreamMap.end()) {
-         if (iter->second != nullptr) {
-            std::string context = iter->second->mStreamAttributes;
-            //if (!context.empty()) {
-
-               int type = WebRtcSDK::ParamPushType(context);
-               if (type == VHDoubleStreamType_Camera) {
-                  ref = true;
-                  break;
-               }
-               else if (type == VHDoubleStreamType_Desktop) {
-                  //mediaType = VHStreamType_Stu_Desktop;
-               }
-               
-            //}
-         }
-         iter++;
-      }
-   }
-   break;
-   case vlive::VHStreamType_Stu_Desktop:
-   {
-      ref = false;
-      std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-      while (iter != mSubScribeStreamMap.end()) {
-         if (iter->second != nullptr) {
-            if ( iter->second->mStreamType == vlive::VHStreamType_Desktop
-               || iter->second->mStreamType == vlive::VHStreamType_Stu_Desktop) {
-               ref = true;
-               break;
-            }
-         }
-         iter++;
-      }
-   }
-      break;
-   case vlive::VHStreamType_Count:
-      break;
-   default:
-      break;
-   }
-   return ref;
-}
-
-bool SubScribeStreamManager::IsCurIdExitStream(const std::string& id, const vlive::VHStreamType& streamType)
-{
-   bool ref = true;
-   switch (streamType)
-   {
-   case vlive::VHStreamType_AUDIO:
-      break;
-   case vlive::VHStreamType_VIDEO:
-      break;
-   case vlive::VHStreamType_AVCapture:
-      break;
-   case vlive::VHStreamType_Desktop:
-      break;
-   case vlive::VHStreamType_MediaFile:
-      break;
-   case vlive::VHStreamType_SoftWare:
-      break;
-   case vlive::VHStreamType_RegionShare:
-      break;
-   case vlive::VHStreamType_Auxiliary_CamerCapture:
-   case vlive::VHStreamType_Stu_Desktop:
-   {
-      ref = false;
-      std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-      while (iter != mSubScribeStreamMap.end()) {
-         if (iter->second != nullptr) {
-            std::string context = iter->second->mStreamAttributes;
-
-            if (!context.empty() && 0==strcmp(iter->second->mId.c_str(), id.c_str())) {
-               
-               ref = true;
-               break;
-            }
-
-         }
-         iter++;
-      }
-   }
-   break;
-   case vlive::VHStreamType_Preview_Video:
-      break;
-   case vlive::VHStreamType_Count:
-      break;
-   default:
-      break;
-   }
-   return ref;
-}
-
-void SubScribeStreamManager::GetStreams(std::list<std::string>& streams)
-{
-   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-   while (iter != mSubScribeStreamMap.end()) {
-      if (iter->second != nullptr) {
-
-         std::string streamid = iter->second->GetID();
-         
-         std::list<std::string>::iterator itor = streams.begin();
-         bool bFind = false;
-         while (itor != streams.end())
-         {
-            if (streamid.compare(*itor) == 0)
-            {
-               bFind = true;
-               break;
-            }
-            itor++;
-         }
-
-         if (bFind);
-         else {
-            streams.push_back(streamid);
-         }
-
-      }
-      iter++;
-   }
-
-}
-
-std::string SubScribeStreamManager::GetAuxiliaryId()
-{
-   std::string user = "";
-   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.begin();
-   while (iter != mSubScribeStreamMap.end()) {
-
-      if (iter->second != nullptr) {
-         std::string context = iter->second->mStreamAttributes;
-
-         if (!context.empty()) {
-            user = iter->second->GetUserId();
-            break;
-         }
-      }
-      iter++;
-   }
-   return user;
-}
-
-bool SubScribeStreamManager::ChangeSubScribeUserSimulCast(const std::wstring& subStreamIndex, vlive::VHSimulCastType type) {
+bool SubScribeStreamManager::ChangeSubScribeUserSimulCast(const std::wstring& user_id,const std::wstring& subStreamIndex, vlive::VHSimulCastType type) {
     LOGD_SDK("enter");
     CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
     LOGD_SDK("%s start", __FUNCTION__);
@@ -575,9 +360,12 @@ bool SubScribeStreamManager::ChangeSubScribeUserSimulCast(const std::wstring& su
     if (iter != mSubScribeStreamMap.end()) {
         if (iter->second != nullptr) {
             int dual = (int)type;
-            mLiveRoom->SetSimulCast(iter->second, dual, [&, dual, subStreamIndex](const vhall::RespMsg& resp) -> void {
+            VRtcEngineEventDelegate* obj = mWebRtcSDKEventReciver;
+            mLiveRoom->SetSimulCast(iter->second, dual, [&, user_id, dual, subStreamIndex, obj](const vhall::RespMsg& resp) -> void {
                 LOGD_SDK("SetSimulCast %d msg %s dual:%d", resp.mCode, resp.mMsg.c_str(), dual);
-               // mWebRtcSDKEventReciver->OnChangeSubScribeUserSimulCast(subStreamIndex, (vlive::VHSimulCastType)dual, resp.mCode, resp.mMsg);
+                if (obj) {
+                   obj->OnChangeSubScribeUserSimulCast(user_id, (vlive::VHSimulCastType)dual, resp.mCode, resp.mMsg);
+                }
             });
             return true;
         }
@@ -589,16 +377,16 @@ bool SubScribeStreamManager::ChangeSubScribeUserSimulCast(const std::wstring& su
 
 std::string SubScribeStreamManager::WString2String(const std::wstring& ws)
 {
-   std::string strLocale = setlocale(LC_ALL, "");
-   const wchar_t* wchSrc = ws.c_str();
-   size_t nDestSize = wcstombs(NULL, wchSrc, 0) + 1;
-   char *chDest = new char[nDestSize];
-   memset(chDest, 0, nDestSize);
-   wcstombs(chDest, wchSrc, nDestSize);
-   std::string strResult = chDest;
-   delete[]chDest;
-   setlocale(LC_ALL, strLocale.c_str());
-   return strResult;
+    std::string strLocale = setlocale(LC_ALL, "");
+    const wchar_t* wchSrc = ws.c_str();
+    size_t nDestSize = wcstombs(NULL, wchSrc, 0) + 1;
+    char *chDest = new char[nDestSize];
+    memset(chDest, 0, nDestSize);
+    wcstombs(chDest, wchSrc, nDestSize);
+    std::string strResult = chDest;
+    delete[]chDest;
+    setlocale(LC_ALL, strLocale.c_str());
+    return strResult;
 }
 // string => wstring
 std::wstring SubScribeStreamManager::String2WString(const std::string& str)
@@ -609,4 +397,44 @@ std::wstring SubScribeStreamManager::String2WString(const std::string& str)
     std::wstring w_str(wide);
     delete[] wide;
     return w_str;
+}
+
+int SubScribeStreamManager::GetAudioLevel(std::wstring user_id) {
+   LOGD_SDK("enter");
+   CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
+   LOGD_SDK("%s start", __FUNCTION__);
+   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(user_id);
+   if (iter != mSubScribeStreamMap.end()) {
+      if (iter->second != nullptr) {
+         vhall::ReceiveAudioSsrc pSsrc;
+         iter->second->GetAudioSubscribeStates(&pSsrc);
+         return pSsrc.AudioOutputLevel;
+      }
+   }
+   LOGD_SDK("%s end", __FUNCTION__);
+   return -1;
+}
+
+double SubScribeStreamManager::GetVideoLostRate(std::wstring user_id) {
+   LOGD_SDK("enter");
+   CThreadLockHandle lockHandle(&mSubScribeStreamMutex);
+   LOGD_SDK("%s start", __FUNCTION__);
+   std::map<std::wstring, std::shared_ptr<vhall::VHStream>>::iterator iter = mSubScribeStreamMap.find(user_id);
+   if (iter != mSubScribeStreamMap.end()) {
+      if (iter->second != nullptr) {
+         std::map<std::wstring, std::shared_ptr<vhall::ReceiveVideoSsrc>>::iterator iterSsrc = mVideoSsrcMap.find(user_id);
+         if (iterSsrc != mVideoSsrcMap.end()) {
+            iter->second->GetVideoSubscribeStates(iterSsrc->second.get());
+            iterSsrc->second->calc();
+            if (iterSsrc->second->CalcData.Bitrate == 0) {
+               return 100.0;
+            }
+            else{
+               return iterSsrc->second->CalcData.PacketsLostRate;
+            }
+         }
+      }
+   }
+   LOGD_SDK("%s end", __FUNCTION__);
+   return -1;
 }
